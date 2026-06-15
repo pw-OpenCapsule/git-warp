@@ -4,7 +4,8 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh
 #
-# Downloads git-warp.sh (installed as `git-warp`) and git-warp.plugin.sh (the
+# Downloads git-warp.sh (installed as `git-warp`), warp-run.sh (installed as
+# `warp-run`, the generic any-command wrapper) and git-warp.plugin.sh (the
 # transparent-mode shell wrapper). By default they go to ~/.local/bin (no
 # sudo). Override the target with BINDIR, e.g.:
 #
@@ -30,6 +31,7 @@ done
 RAW_BASE="https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main"
 BINDIR="${BINDIR:-$HOME/.local/bin}"
 TARGET="$BINDIR/git-warp"
+WARPRUN="$BINDIR/warp-run"
 PLUGIN="$BINDIR/git-warp.plugin.sh"
 
 mkdir -p "$BINDIR"
@@ -49,6 +51,10 @@ fetch() {
 fetch "$RAW_BASE/git-warp.sh" "$TARGET"
 chmod +x "$TARGET"
 echo "git-warp installed to $TARGET"
+
+fetch "$RAW_BASE/warp-run.sh" "$WARPRUN"
+chmod +x "$WARPRUN"
+echo "warp-run installed to $WARPRUN"
 
 fetch "$RAW_BASE/git-warp.plugin.sh" "$PLUGIN"
 echo "transparent-mode wrapper installed to $PLUGIN"

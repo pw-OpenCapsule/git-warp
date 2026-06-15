@@ -48,13 +48,48 @@ git-warp push origin main
 git-warp clone https://your-internal-host/group/repo.git
 ```
 
+## 其它命令（不只是 git）
+
+除了 git，别的要连内网的命令（创建 PR、调内网 API…）也能用同一套 WARP 逻辑——用 `warp-run` 包一下：目标 host 不通时自动开 WARP，跑完恢复原状。
+
+```sh
+# 创建 PR
+warp-run tea pr create --base main --head feature ...
+warp-run glab mr create ...
+
+# 调内网 API
+warp-run curl https://your-internal-host/api/...
+```
+
+`warp-run` 没有默认 host，需要设 `WARP_HOST`（或复用 `GIT_WARP_HOST`）：
+
+```sh
+export WARP_HOST=your-internal-host
+```
+
+### 自动化：让这些命令也像 git 一样自动走 WARP
+
+把常用命令名加进 `WARP_WRAP_CMDS`（空格分隔），加到 `~/.zshrc` 或 `~/.bashrc`：
+
+```sh
+export WARP_HOST=your-internal-host
+export WARP_WRAP_CMDS="tea glab"
+source ~/.local/bin/git-warp.plugin.sh
+```
+
+之后照常敲 `tea pr create ...` / `glab mr create ...` 就自动走 WARP，不用每次记着加 `warp-run`。默认 `WARP_WRAP_CMDS` 为空，不强加任何命令，由你显式配置。
+
 ## 配置
 
 | 环境变量 | 默认值 | 含义 |
 |---|---|---|
-| `GIT_WARP_HOST` | `clone` 时取 clone URL 的 host，否则取 `origin` 远端的 host | 探测 / 走 WARP 的目标主机 |
+| `GIT_WARP_HOST` | `clone` 时取 clone URL 的 host，否则取 `origin` 远端的 host | git-warp 探测 / 走 WARP 的目标主机 |
 | `GIT_WARP_PORT` | `443` | 探测可达性的端口 |
 | `GIT_WARP_WAIT` | `40` | 等 WARP 把主机变可达的秒数 |
+| `WARP_HOST` | 无（未设则回落 `GIT_WARP_HOST`） | warp-run 的目标主机；都没设 warp-run 报错退出 |
+| `WARP_PORT` | `443`（回落 `GIT_WARP_PORT`） | warp-run 探测端口 |
+| `WARP_WAIT` | `40`（回落 `GIT_WARP_WAIT`） | warp-run 等 WARP 的秒数 |
+| `WARP_WRAP_CMDS` | 空 | 透明包装的额外命令名（空格分隔，如 `"tea glab"`），走 `warp-run` |
 
 ## 说明
 
