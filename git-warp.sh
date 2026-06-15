@@ -20,7 +20,8 @@
 #
 # Target host resolution (first match wins):
 #   1. $GIT_WARP_HOST            — explicit override
-#   2. host of `git remote get-url origin`  — auto-detected from the repo
+#   2. for `clone`: host parsed from the clone URL argument (no origin yet)
+#   3. host of `git remote get-url origin`  — auto-detected from the repo
 # Port defaults to 443 ($GIT_WARP_PORT to override).
 # Wait timeout defaults to 40s ($GIT_WARP_WAIT, in seconds).
 
@@ -52,8 +53,30 @@ url_host() {
 }
 
 HOST="${GIT_WARP_HOST:-}"
+
+# For `clone` there is no origin remote yet, so resolve the host from the
+# clone URL on the command line: the first non-flag argument (after the
+# `clone` subcommand) that looks like a URL or scp-style path.
+if [ -z "$HOST" ] && [ "${1:-}" = "clone" ]; then
+  shift_seen_clone=0
+  for arg in "$@"; do
+    if [ "$shift_seen_clone" -eq 0 ]; then
+      # skip the literal `clone` token itself
+      shift_seen_clone=1
+      continue
+    fi
+    case "$arg" in
+      -*) continue ;;                 # skip flags (-b, --depth, etc.)
+      *://*|*@*:*|*:*/*|*:*)          # URL or scp-like [user@]host:path
+        HOST="$(url_host "$arg")"
+        [ -n "$HOST" ] && break
+        ;;
+    esac
+  done
+fi
+
 if [ -z "$HOST" ]; then
-  origin_url="$(git remote get-url origin 2>/dev/null || true)"
+  origin_url="$(command git remote get-url origin 2>/dev/null || true)"
   if [ -n "$origin_url" ]; then
     HOST="$(url_host "$origin_url")"
   fi
@@ -122,5 +145,8 @@ else
   echo "git-warp: $HOST:$PORT reachable, running git" >&2
 fi
 
-git "$@"
+# Use `command git` so that, if a `git()` shell wrapper function from
+# git-warp.plugin.sh leaks into this process's environment somehow, we still
+# invoke the real git binary and never recurse back into git-warp.
+command git "$@"
 exit $?
