@@ -82,9 +82,16 @@ Empty by default — nothing extra is wrapped unless you opt in.
 ## Configuration
 
 - `GIT_WARP_HOST` — git-warp target host (default: for `clone`, parsed from the
-  clone URL argument; otherwise parsed from the `origin` remote URL).
+  clone URL argument; for `push`/`pull`/`fetch`/`ls-remote`, parsed from the
+  remote argument in the command — e.g. `fetch gitlab dev` → the `gitlab`
+  remote — resolved in the repo selected by any leading `git -C <path>`;
+  otherwise from the `origin` remote URL). Leading git global options
+  (`-C <path>`, `-c <kv>`, `--git-dir`, …) are parsed the way git does.
 - `GIT_WARP_PORT` — port to probe (default: `443`).
 - `GIT_WARP_WAIT` — seconds to wait for WARP (default: `40`).
+- `GIT_WARP_DEBUG` — when set (e.g. `1`), print the resolved subcommand /
+  remote / host and exit without touching WARP or git (for testing host
+  inference).
 - `WARP_HOST` — warp-run target host (no default; falls back to `GIT_WARP_HOST`).
 - `WARP_PORT` / `WARP_WAIT` — warp-run port / wait (fall back to the `GIT_WARP_*`
   equivalents; defaults `443` / `40`).

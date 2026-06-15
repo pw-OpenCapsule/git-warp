@@ -21,9 +21,20 @@
 # Target host resolution (first match wins):
 #   1. $GIT_WARP_HOST            — explicit override
 #   2. for `clone`: host parsed from the clone URL argument (no origin yet)
-#   3. host of `git remote get-url origin`  — auto-detected from the repo
+#   3. for push/pull/fetch/ls-remote: host of the *remote argument* in the
+#      command (e.g. `fetch gitlab dev` -> remote `gitlab`), looked up in the
+#      repository selected by any leading `git -C <path>` global options;
+#      falls back to `origin` when there's no positional remote.
+#   4. host of `git [-C ...] remote get-url origin`  — auto-detected.
+# Leading git global options are parsed the way git does: repeated `-C <path>`
+# is accumulated (and passed through to the inner `git remote` lookups), and
+# other valued global options (-c <kv>, --git-dir <d>, --work-tree <d>, …) are
+# skipped together with their value so they're not mistaken for the subcommand
+# or remote name.
 # Port defaults to 443 ($GIT_WARP_PORT to override).
 # Wait timeout defaults to 40s ($GIT_WARP_WAIT, in seconds).
+# Set GIT_WARP_DEBUG=1 to print the resolved host (and remote) and exit without
+# touching WARP or git — handy for testing/reproducing host-inference issues.
 
 set -uo pipefail
 
@@ -52,19 +63,90 @@ url_host() {
   esac
 }
 
+# Parse the leading git global options (everything before the subcommand) the
+# same way git does. Populates two globals:
+#   CDIRS   — array of `-C <path>` tokens, in order (passed through to the
+#             inner `git remote get-url` lookups so the host is resolved in the
+#             repo git itself would operate on; git applies multiple -C
+#             cumulatively, so passing them all through reproduces that).
+#   SUBCMD  — the git subcommand (first non-option, non-option-value arg).
+#   SUBIDX  — 1-based index of SUBCMD within "$@" (0 if none found).
+# Valued global options are skipped together with their value so neither the
+# value nor a following positional is mistaken for the subcommand.
+CDIRS=()
+SUBCMD=""
+SUBIDX=0
+parse_globals() {
+  local i=1 a
+  while [ "$i" -le "$#" ]; do
+    a="${!i}"
+    case "$a" in
+      -C)
+        # -C <path>: accumulate both tokens, advance past the value.
+        local j=$((i + 1))
+        if [ "$j" -le "$#" ]; then
+          CDIRS+=( -C "${!j}" )
+          i=$((i + 2))
+          continue
+        fi
+        i=$((i + 1))
+        ;;
+      -c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env)
+        # valued global option in "--opt <val>" form: skip the value too.
+        i=$((i + 2))
+        ;;
+      --git-dir=*|--work-tree=*|--namespace=*|-C=*|--super-prefix=*|--config-env=*|-c=*)
+        # valued global option in "--opt=val" form: value is attached.
+        i=$((i + 1))
+        ;;
+      --*|-*)
+        # any other leading flag (e.g. -p, --no-pager, --bare, --paginate):
+        # boolean global option, skip just this token.
+        i=$((i + 1))
+        ;;
+      *)
+        # first non-option, non-option-value argument => the subcommand.
+        SUBCMD="$a"
+        SUBIDX="$i"
+        return 0
+        ;;
+    esac
+  done
+  return 0
+}
+parse_globals "$@"
+
+# For network subcommands that take a remote argument, the remote name is the
+# first *positional* argument after the subcommand (skipping flags and the
+# values of valued flags). `fetch --all` / no positional remote -> "" (origin).
+remote_arg() {
+  local i=$((SUBIDX + 1)) a
+  [ "$SUBIDX" -gt 0 ] || return 0
+  while [ "$i" -le "$#" ]; do
+    a="${!i}"
+    case "$a" in
+      # flags that consume the next token as their value — skip both.
+      -o|--upload-pack|--exec|--depth|--deepen|--shallow-since|--shallow-exclude|--refmap|-j|--jobs|--negotiation-tip|--server-option|--recurse-submodules)
+        i=$((i + 2))
+        ;;
+      -*) i=$((i + 1)) ;;             # other flags: skip just this token
+      *) printf '%s' "$a"; return 0 ;; # first positional => remote name
+    esac
+  done
+  return 0
+}
+
 HOST="${GIT_WARP_HOST:-}"
+REMOTE=""
 
 # For `clone` there is no origin remote yet, so resolve the host from the
 # clone URL on the command line: the first non-flag argument (after the
 # `clone` subcommand) that looks like a URL or scp-style path.
-if [ -z "$HOST" ] && [ "${1:-}" = "clone" ]; then
-  shift_seen_clone=0
-  for arg in "$@"; do
-    if [ "$shift_seen_clone" -eq 0 ]; then
-      # skip the literal `clone` token itself
-      shift_seen_clone=1
-      continue
-    fi
+if [ -z "$HOST" ] && [ "$SUBCMD" = "clone" ]; then
+  i=$((SUBIDX + 1))
+  while [ "$i" -le "$#" ]; do
+    arg="${!i}"
+    i=$((i + 1))
     case "$arg" in
       -*) continue ;;                 # skip flags (-b, --depth, etc.)
       *://*|*@*:*|*:*/*|*:*)          # URL or scp-like [user@]host:path
@@ -75,11 +157,31 @@ if [ -z "$HOST" ] && [ "${1:-}" = "clone" ]; then
   done
 fi
 
+# For network subcommands, infer the host from the remote *argument* in the
+# command (looked up in the -C-selected repo); fall back to origin.
 if [ -z "$HOST" ]; then
-  origin_url="$(command git remote get-url origin 2>/dev/null || true)"
-  if [ -n "$origin_url" ]; then
-    HOST="$(url_host "$origin_url")"
+  case "$SUBCMD" in
+    fetch|pull|push|ls-remote) REMOTE="$(remote_arg "$@")" ;;
+    remote)                    REMOTE="" ;;   # `remote update` -> origin
+  esac
+
+  remote_url=""
+  if [ -n "$REMOTE" ]; then
+    remote_url="$(command git "${CDIRS[@]}" remote get-url "$REMOTE" 2>/dev/null || true)"
   fi
+  # No positional remote, or it didn't resolve (e.g. doesn't exist) -> origin.
+  if [ -z "$remote_url" ]; then
+    REMOTE="origin"
+    remote_url="$(command git "${CDIRS[@]}" remote get-url origin 2>/dev/null || true)"
+  fi
+  if [ -n "$remote_url" ]; then
+    HOST="$(url_host "$remote_url")"
+  fi
+fi
+
+if [ -n "${GIT_WARP_DEBUG:-}" ]; then
+  echo "git-warp: [debug] subcmd=${SUBCMD:-} remote=${REMOTE:-} cdirs=${CDIRS[*]:-} host=${HOST:-}" >&2
+  exit 0
 fi
 
 if [ -z "$HOST" ]; then
