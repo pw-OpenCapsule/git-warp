@@ -1,83 +1,70 @@
 # git-warp
 
-Run git against a remote that's only reachable through Cloudflare WARP.
-Auto-connects WARP when the remote is unreachable, runs your git command,
-then restores WARP to its previous state.
+让只能通过 Cloudflare WARP 访问的内网 git 远端，照常用 `git push` / `git pull` / `git clone` 就能用——远端不通时自动开 WARP 穿墙，跑完再自动恢复 WARP 原状。可达的远端（如 github.com）完全不受影响。
 
-## The problem
+![git-warp 工作示意](assets/git-warp.png)
 
-Some git remotes — private or internal servers — only answer when you're
-connected to [Cloudflare WARP](https://developers.cloudflare.com/warp-client/).
-When you're off WARP, `git push` / `pull` / `fetch` hangs and dies with
-`Couldn't connect to server` or `Failed to connect ... port 443`.
+> 正常 push → 撞上内网服务器墙 → WARP 自动 ON 打隧道穿墙 → push 成功 → WARP 自动 OFF 恢复原状。
 
-Connecting WARP by hand before every git command (and remembering to turn it
-back off) is tedious. `git-warp` does it for you, and only when needed.
+English version: [README.en.md](README.en.md)
 
-## What it does
-
-1. Figures out the remote host (from `GIT_WARP_HOST`, else `git remote get-url origin`).
-2. If `host:port` is **already reachable**, it runs git and leaves WARP untouched.
-3. Otherwise it runs `warp-cli connect`, waits until the port becomes reachable
-   (up to `GIT_WARP_WAIT` seconds), then runs git.
-4. On exit — success, git failure, or interruption — a `trap` **restores WARP
-   to its entry state**: it disconnects only if WARP was off when you started,
-   and leaves it connected if it was already on.
-
-The exit code is git's own exit code, or `2` if WARP couldn't make the host
-reachable in time.
-
-## Install
+## 安装
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh
 ```
 
-This installs `git-warp` to `~/.local/bin` (override with `BINDIR=/usr/local/bin`).
-Make sure that directory is on your `PATH`.
-
-As an agent skill (Claude Code / Cursor / Codex / Gemini CLI):
+作为 agent skill（Claude Code / Cursor / Codex / Gemini CLI）：
 
 ```sh
 npx skills add pw-OpenCapsule/git-warp -y -g
 ```
 
-## Usage
+## 用法（透明模式，推荐）
 
-`git-warp` takes the exact arguments you'd give `git` — they pass through unchanged:
+把这行加到 `~/.zshrc` 或 `~/.bashrc`（安装脚本会打印这行；也可重跑安装脚本加 `--activate` 自动追加）：
+
+```sh
+source ~/.local/bin/git-warp.plugin.sh
+```
+
+然后照常用 git 就行，内网远端会自动走 WARP：
+
+```sh
+git push
+git pull
+git fetch --all
+git clone https://your-internal-host/group/repo.git
+```
+
+只拦截网络子命令（`push` / `pull` / `fetch` / `clone` / `ls-remote` / `remote update`），其余子命令（`commit` / `status` / `add` / `log` …）原样直通真实 git，零延迟、零行为变化。
+
+### 备选：不想改 shell
+
+直接调 `git-warp`，参数和 `git` 完全一样：
 
 ```sh
 git-warp push origin main
-git-warp pull
-git-warp fetch --all
 git-warp clone https://your-internal-host/group/repo.git
 ```
 
-## Configuration
+## 配置
 
-| Env var | Default | Meaning |
+| 环境变量 | 默认值 | 含义 |
 |---|---|---|
-| `GIT_WARP_HOST` | host of `origin` remote | Target host to probe / route through WARP |
-| `GIT_WARP_PORT` | `443` | Port to probe for reachability |
-| `GIT_WARP_WAIT` | `40` | Seconds to wait for WARP to make the host reachable |
+| `GIT_WARP_HOST` | `clone` 时取 clone URL 的 host，否则取 `origin` 远端的 host | 探测 / 走 WARP 的目标主机 |
+| `GIT_WARP_PORT` | `443` | 探测可达性的端口 |
+| `GIT_WARP_WAIT` | `40` | 等 WARP 把主机变可达的秒数 |
 
-Host resolution order: `GIT_WARP_HOST` wins; otherwise the host is parsed from
-`git remote get-url origin`. If you push to a remote other than `origin` and its
-host differs, set `GIT_WARP_HOST` explicitly.
+## 说明
 
-## Behavior notes
+- 远端已可达 → 完全不碰 WARP。
+- 用 `trap` 恢复 WARP：进入时是关的就关回去，是开的就保持开；即使 git 失败或 Ctrl-C 也会恢复。
+- 绝不断开不是自己开的 WARP 会话。
 
-- **Already reachable → WARP untouched.** If the host answers without WARP,
-  git-warp won't connect or disconnect anything.
-- **State is restored via `trap`.** Even if git fails or you Ctrl-C, WARP returns
-  to how it was on entry: off stays off, on stays on.
-- It never disconnects a WARP session it didn't open.
+## 依赖
 
-## Requirements
-
-- [`warp-cli`](https://developers.cloudflare.com/warp-client/get-started/) — the Cloudflare WARP client
-- `nc` (netcat) — for the reachability probe
-- `git`
+[`warp-cli`](https://developers.cloudflare.com/warp-client/get-started/)、`nc`（netcat）、`git`。
 
 ## License
 
