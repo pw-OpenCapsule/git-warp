@@ -8,27 +8,30 @@
 
 English version: [README.en.md](README.en.md)
 
-## 安装
+## 安装（一条命令搞定）
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh
 ```
 
-作为 agent skill（Claude Code / Cursor / Codex / Gemini CLI）：
+跑完即装好并**自动激活透明模式**——脚本会把 `source <plugin>` 写进你的 shell rc
+（`~/.zshrc` / `~/.bashrc` / `~/.profile`，按 `$SHELL` 自动判断，幂等不重复写）。
+**重启终端**（或按提示 `source` 一下）后，照常 `git push` 就会在内网远端不通时自动走 WARP。
+
+> 不想让脚本动你的 rc？加 `--no-activate`（或设 `GIT_WARP_NO_ACTIVATE=1`），见下方[备选](#备选不想改-shell手动激活)。
+
+### 给 AI agent 用的 skill 安装
 
 ```sh
 npx skills add pw-OpenCapsule/git-warp -y -g
 ```
 
-## 用法（透明模式，推荐）
+这条只把 git-warp 作为 agent skill（Claude Code / Cursor / Codex / Gemini CLI）装好，
+**不会改你的 shell、也不激活透明模式**——仅供 agent runner 显式调用 `git-warp` / `warp-run`。
 
-把这行加到 `~/.zshrc` 或 `~/.bashrc`（安装脚本会打印这行；也可重跑安装脚本加 `--activate` 自动追加）：
+## 用法（透明模式，已自动激活）
 
-```sh
-source ~/.local/bin/git-warp.plugin.sh
-```
-
-然后照常用 git 就行，内网远端会自动走 WARP：
+上面的一条命令已经帮你激活了透明模式，重启终端后照常用 git 即可，内网远端会自动走 WARP：
 
 ```sh
 git push
@@ -39,9 +42,21 @@ git clone https://your-internal-host/group/repo.git
 
 只拦截网络子命令（`push` / `pull` / `fetch` / `clone` / `ls-remote` / `remote update`），其余子命令（`commit` / `status` / `add` / `log` …）原样直通真实 git，零延迟、零行为变化。
 
-### 备选：不想改 shell
+### 备选：不想改 shell / 手动激活
 
-直接调 `git-warp`，参数和 `git` 完全一样：
+装的时候带 `--no-activate`（或 `GIT_WARP_NO_ACTIVATE=1`）就不会动你的 rc：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh -s -- --no-activate
+```
+
+之后想自己控制时，把这行加到 `~/.zshrc` 或 `~/.bashrc`（脚本会打印这行）：
+
+```sh
+source ~/.local/bin/git-warp.plugin.sh
+```
+
+或者干脆不改 shell，直接调 `git-warp`，参数和 `git` 完全一样：
 
 ```sh
 git-warp push origin main

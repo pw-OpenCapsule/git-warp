@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# install.sh — install git-warp into your PATH.
+# install.sh — install git-warp into your PATH and activate transparent mode.
 #
 #   curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh
 #
@@ -11,20 +11,27 @@
 #
 #   curl -fsSL .../install.sh | BINDIR=/usr/local/bin sh
 #
-# Transparent mode: source the installed git-warp.plugin.sh from your shell rc
-# to make plain `git push` / `git pull` / `git clone <url>` auto-route through
-# WARP for unreachable remotes. This installer does NOT edit your rc file; it
-# prints the line to add. Pass --activate to have it append that line to your
-# rc file for you:
+# Transparent mode is activated by default: the installer appends a
+# `source <plugin>` line to your shell rc (~/.zshrc / ~/.bashrc / ~/.profile,
+# picked from $SHELL) so plain `git push` / `git pull` / `git clone <url>`
+# auto-route through WARP for unreachable remotes. The append is idempotent —
+# re-running won't duplicate the line. To skip it (don't touch your rc), pass
+# --no-activate or set GIT_WARP_NO_ACTIVATE=1:
 #
-#   curl -fsSL .../install.sh | sh -s -- --activate
+#   curl -fsSL .../install.sh | sh -s -- --no-activate
+#   curl -fsSL .../install.sh | GIT_WARP_NO_ACTIVATE=1 sh
 #
 set -eu
 
-ACTIVATE=0
+# Default: activate. --no-activate (or GIT_WARP_NO_ACTIVATE=1) opts out.
+ACTIVATE=1
+if [ "${GIT_WARP_NO_ACTIVATE:-}" = "1" ]; then
+  ACTIVATE=0
+fi
 for arg in "$@"; do
   case "$arg" in
-    --activate) ACTIVATE=1 ;;
+    --no-activate) ACTIVATE=0 ;;
+    --activate)    ACTIVATE=1 ;;
   esac
 done
 
@@ -66,30 +73,34 @@ case ":$PATH:" in
 esac
 
 SOURCE_LINE="source \"$PLUGIN\""
+MARKER="# git-warp transparent mode"
 
-# Pick the most likely rc file for the activation hint / append.
+# Pick the shell rc to activate in, based on $SHELL.
 case "${SHELL:-}" in
-  *zsh) RC="$HOME/.zshrc" ;;
+  *zsh)  RC="$HOME/.zshrc" ;;
   *bash) RC="$HOME/.bashrc" ;;
-  *) RC="$HOME/.zshrc" ;;
+  *)     RC="$HOME/.profile" ;;
 esac
 
 if [ "$ACTIVATE" -eq 1 ]; then
+  # Idempotent: skip if the plugin path (or our marker) is already in the rc.
   if [ -f "$RC" ] && grep -qF "$PLUGIN" "$RC" 2>/dev/null; then
-    echo "transparent mode already enabled in $RC"
+    echo "✓ 透明模式已激活（${RC} 已包含 git-warp，跳过）。"
   else
-    printf '\n# git-warp transparent mode\n%s\n' "$SOURCE_LINE" >> "$RC"
-    echo "transparent mode enabled: appended to $RC"
-    echo "restart your shell or run: $SOURCE_LINE"
+    # Create the rc if missing, then append the source line with a marker.
+    [ -f "$RC" ] || : > "$RC"
+    printf '\n%s\n%s\n' "$MARKER" "$SOURCE_LINE" >> "$RC"
+    echo "✓ 已激活透明模式（写入 ${RC}）。重启终端，或运行 ${SOURCE_LINE} 立即生效。"
   fi
 else
   echo ""
-  echo "To enable transparent mode (plain 'git push'/'git pull'/'git clone' auto-route"
-  echo "through WARP for unreachable remotes), add this line to your ~/.zshrc or ~/.bashrc:"
+  echo "跳过自动激活（--no-activate）。要启用透明模式（让 'git push' / 'git pull' /"
+  echo "'git clone' 在远端不通时自动走 WARP），把这行加到你的 shell rc："
   echo ""
   echo "    $SOURCE_LINE"
   echo ""
-  echo "(or re-run this installer with --activate to append it for you)"
 fi
 
-echo "try: git-warp --version   (any git args are passed through)"
+echo ""
+echo "完成。确认安装：git-warp --help  （任意 git 参数都会透传）"
+echo "重开终端后，照常 git push 即自动走 WARP。"

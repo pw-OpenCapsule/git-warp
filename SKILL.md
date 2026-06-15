@@ -102,8 +102,16 @@ Empty by default — nothing extra is wrapped unless you opt in.
 
 ## Install
 
+One command — installs the binaries and auto-activates transparent mode by
+appending `source <plugin>` to the user's shell rc (idempotent; opt out with
+`--no-activate` or `GIT_WARP_NO_ACTIVATE=1`):
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh
 ```
+
+As an agent skill (`npx skills add pw-OpenCapsule/git-warp -y -g`) it does **not**
+edit any shell rc — the agent calls `git-warp` / `warp-run` explicitly, or sources
+the plugin manually.
 
 Requires `warp-cli`, `nc` (netcat), and `git`.
