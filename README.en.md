@@ -28,35 +28,38 @@ back off) is tedious. `git-warp` does it for you, and only when needed.
 The exit code is git's own exit code, or `2` if WARP couldn't make the host
 reachable in time.
 
-## Install
+## Install — one command
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh
 ```
 
-This installs `git-warp` and the transparent-mode wrapper `git-warp.plugin.sh`
-to `~/.local/bin` (override with `BINDIR=/usr/local/bin`). Make sure that
-directory is on your `PATH`.
+This installs `git-warp`, `warp-run`, and the transparent-mode wrapper
+`git-warp.plugin.sh` to `~/.local/bin` (override with `BINDIR=/usr/local/bin`;
+make sure it's on your `PATH`) **and auto-activates transparent mode** — it
+appends a `source <plugin>` line to your shell rc (`~/.zshrc` / `~/.bashrc` /
+`~/.profile`, chosen from `$SHELL`; idempotent, never duplicated). **Restart
+your terminal** (or `source` the rc as prompted) and a plain `git push` will
+auto-route through WARP whenever the remote is unreachable.
 
-As an agent skill (Claude Code / Cursor / Codex / Gemini CLI):
+> Don't want the installer touching your rc? Pass `--no-activate` (or set
+> `GIT_WARP_NO_ACTIVATE=1`) — see [the fallback below](#without-changing-your-shell-manual-activation).
+
+### As an agent skill
 
 ```sh
 npx skills add pw-OpenCapsule/git-warp -y -g
 ```
 
-## Usage — transparent mode (recommended)
+This installs git-warp only as an agent skill (Claude Code / Cursor / Codex /
+Gemini CLI). It **does not edit your shell or activate transparent mode** — it's
+for an agent runner to call `git-warp` / `warp-run` explicitly.
 
-Source the installed wrapper from your shell rc, then **just use git normally**:
+## Usage — transparent mode (auto-activated)
 
-```sh
-# add to ~/.zshrc or ~/.bashrc:
-source ~/.local/bin/git-warp.plugin.sh
-```
-
-(The installer prints this exact line; re-run it with `--activate` to append it
-for you instead of editing your rc by hand.)
-
-Now your everyday commands transparently route through WARP when needed:
+The one-line install already activated transparent mode for you, so after
+restarting your terminal your everyday commands transparently route through WARP
+when needed:
 
 ```sh
 git push
@@ -73,10 +76,24 @@ touches WARP when the remote is actually unreachable, public remotes like
 `github.com` are completely unaffected — only an internal-only remote triggers
 the auto-connect.
 
-### Without changing your shell (explicit fallback)
+### Without changing your shell (manual activation)
 
-If you'd rather not source anything, call `git-warp` directly — it takes the
-exact arguments you'd give `git`:
+Install with `--no-activate` (or `GIT_WARP_NO_ACTIVATE=1`) to keep the installer
+out of your rc:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/git-warp/main/install.sh | sh -s -- --no-activate
+```
+
+Then, when you want it, add the line yourself (the installer prints it):
+
+```sh
+# add to ~/.zshrc or ~/.bashrc:
+source ~/.local/bin/git-warp.plugin.sh
+```
+
+Or skip sourcing entirely and call `git-warp` directly — it takes the exact
+arguments you'd give `git`:
 
 ```sh
 git-warp push origin main
