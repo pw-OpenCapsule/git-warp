@@ -48,12 +48,48 @@ git-warp clone https://your-internal-host/group/repo.git
 Any git arguments pass through unchanged. Exit code is git's exit code, or `2`
 if WARP couldn't make the host reachable in time.
 
+## Other commands — `warp-run`
+
+For non-git commands that also need the internal network (open a PR with `tea`
+/ `glab`, call an internal API with `curl`, …), wrap them with `warp-run`. It
+uses the same WARP toggle logic as `git-warp` (connect when unreachable, run the
+command, restore WARP on exit):
+
+```sh
+warp-run tea pr create --base main --head feature ...
+warp-run curl https://your-internal-host/api/...
+```
+
+`warp-run` has no default host — set `WARP_HOST` (or reuse `GIT_WARP_HOST`). Its
+exit code is the wrapped command's, or `2` if WARP couldn't make the host
+reachable.
+
+### Auto-wrap extra commands (`WARP_WRAP_CMDS`)
+
+Set `WARP_WRAP_CMDS` to a space-separated list of command names before sourcing
+`git-warp.plugin.sh`; it defines a same-named shell function for each that routes
+through `warp-run`, so the commands auto-route through WARP just like git:
+
+```sh
+export WARP_HOST=your-internal-host
+export WARP_WRAP_CMDS="tea glab"
+source ~/.local/bin/git-warp.plugin.sh
+# now: tea pr create ...  /  glab mr create ...  auto-connect WARP
+```
+
+Empty by default — nothing extra is wrapped unless you opt in.
+
 ## Configuration
 
-- `GIT_WARP_HOST` — target host (default: for `clone`, parsed from the clone
-  URL argument; otherwise parsed from the `origin` remote URL).
+- `GIT_WARP_HOST` — git-warp target host (default: for `clone`, parsed from the
+  clone URL argument; otherwise parsed from the `origin` remote URL).
 - `GIT_WARP_PORT` — port to probe (default: `443`).
 - `GIT_WARP_WAIT` — seconds to wait for WARP (default: `40`).
+- `WARP_HOST` — warp-run target host (no default; falls back to `GIT_WARP_HOST`).
+- `WARP_PORT` / `WARP_WAIT` — warp-run port / wait (fall back to the `GIT_WARP_*`
+  equivalents; defaults `443` / `40`).
+- `WARP_WRAP_CMDS` — extra command names to wrap transparently via `warp-run`
+  (space-separated, e.g. `"tea glab"`; empty by default).
 
 ## Notes
 

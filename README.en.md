@@ -85,13 +85,54 @@ git-warp fetch --all
 git-warp clone https://your-internal-host/group/repo.git
 ```
 
+## Other commands (not just git)
+
+Other commands that need the internal network — opening a PR, calling an
+internal API — can use the same WARP logic via `warp-run`: it brings WARP up
+when the target host is unreachable, runs your command, then restores WARP.
+
+```sh
+# open a PR
+warp-run tea pr create --base main --head feature ...
+warp-run glab mr create ...
+
+# call an internal API
+warp-run curl https://your-internal-host/api/...
+```
+
+`warp-run` has **no default host** — set `WARP_HOST` (or reuse `GIT_WARP_HOST`):
+
+```sh
+export WARP_HOST=your-internal-host
+```
+
+### Automate: make these commands auto-route through WARP too
+
+Add the command names to `WARP_WRAP_CMDS` (space-separated) in your shell rc.
+The plugin then defines a same-named shell function for each that routes it
+through `warp-run`, so you keep typing the command as usual:
+
+```sh
+export WARP_HOST=your-internal-host
+export WARP_WRAP_CMDS="tea glab"
+source ~/.local/bin/git-warp.plugin.sh
+```
+
+Now `tea pr create ...` / `glab mr create ...` auto-connect WARP just like git
+does. `WARP_WRAP_CMDS` is empty by default — nothing extra is wrapped unless you
+opt in.
+
 ## Configuration
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `GIT_WARP_HOST` | host of `origin` remote | Target host to probe / route through WARP |
+| `GIT_WARP_HOST` | host of `origin` remote | git-warp target host to probe / route through WARP |
 | `GIT_WARP_PORT` | `443` | Port to probe for reachability |
 | `GIT_WARP_WAIT` | `40` | Seconds to wait for WARP to make the host reachable |
+| `WARP_HOST` | none (falls back to `GIT_WARP_HOST`) | warp-run target host; if neither is set, warp-run errors out |
+| `WARP_PORT` | `443` (falls back to `GIT_WARP_PORT`) | Port warp-run probes |
+| `WARP_WAIT` | `40` (falls back to `GIT_WARP_WAIT`) | Seconds warp-run waits for WARP |
+| `WARP_WRAP_CMDS` | empty | Extra command names to wrap transparently (space-separated, e.g. `"tea glab"`), routed through `warp-run` |
 
 Host resolution order: `GIT_WARP_HOST` wins; for `clone` the host is parsed
 from the clone URL on the command line (there's no `origin` yet); otherwise the
