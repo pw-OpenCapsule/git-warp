@@ -98,13 +98,18 @@ source ~/.local/bin/git-warp.plugin.sh
 
 | 环境变量 | 默认值 | 含义 |
 |---|---|---|
-| `GIT_WARP_HOST` | `clone` 时取 clone URL 的 host，否则取 `origin` 远端的 host | git-warp 探测 / 走 WARP 的目标主机 |
+| `GIT_WARP_HOST` | `clone` 取 URL 的 host；`push`/`pull`/`fetch`/`ls-remote` 取命令里 **remote 参数**的 host（按前导 `-C` 选中的仓库查），否则取 `origin` 远端的 host | git-warp 探测 / 走 WARP 的目标主机 |
 | `GIT_WARP_PORT` | `443` | 探测可达性的端口 |
 | `GIT_WARP_WAIT` | `40` | 等 WARP 把主机变可达的秒数 |
+| `GIT_WARP_DEBUG` | 未设 | 设了（如 `1`）只打印解析出的 子命令/remote/host 然后退出，**不碰** WARP 和 git，用于排查 host 推断 |
 | `WARP_HOST` | 无（未设则回落 `GIT_WARP_HOST`） | warp-run 的目标主机；都没设 warp-run 报错退出 |
 | `WARP_PORT` | `443`（回落 `GIT_WARP_PORT`） | warp-run 探测端口 |
 | `WARP_WAIT` | `40`（回落 `GIT_WARP_WAIT`） | warp-run 等 WARP 的秒数 |
 | `WARP_WRAP_CMDS` | 空 | 透明包装的额外命令名（空格分隔，如 `"tea glab"`），走 `warp-run` |
+
+### host 解析顺序
+
+`GIT_WARP_HOST` 最高优先；`clone` 从命令行 URL 取 host；`push`/`pull`/`fetch`/`ls-remote` 取命令里的 **remote 参数**（如 `fetch gitlab dev` → `gitlab` 远端），并在前导 `git -C <path>` 选中的那个仓库里查；没有位置 remote（`fetch --all`、`remote update`）或 remote 不存在时回退 `origin`。前导 git 全局选项（可重复的 `-C <path>`、`-c <kv>`、`--git-dir`、`--work-tree` …）按 git 自身的规则解析，所以把 `git-warp` 直接套在 `git -C /path -c … fetch <remote>` 前面也能从正确的仓库和 remote 解析出 host。
 
 ## 说明
 

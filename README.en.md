@@ -17,7 +17,12 @@ back off) is tedious. `git-warp` does it for you, and only when needed.
 ## What it does
 
 1. Figures out the remote host (from `GIT_WARP_HOST`; for `clone`, from the
-   clone URL argument; otherwise from `git remote get-url origin`).
+   clone URL argument; for `push`/`pull`/`fetch`/`ls-remote`, from the **remote
+   argument** in the command — e.g. `fetch gitlab dev` resolves the `gitlab`
+   remote — looked up in the repo selected by any leading `git -C <path>`;
+   otherwise from `git remote get-url origin`). Leading git global options
+   (`-C <path>`, `-c <kv>`, `--git-dir`, …) are parsed the way git does, so
+   `git-warp -C /path fetch gitlab dev` inspects the right repo.
 2. If `host:port` is **already reachable**, it runs git and leaves WARP untouched.
 3. Otherwise it runs `warp-cli connect`, waits until the port becomes reachable
    (up to `GIT_WARP_WAIT` seconds), then runs git.
@@ -143,18 +148,26 @@ opt in.
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `GIT_WARP_HOST` | host of `origin` remote | git-warp target host to probe / route through WARP |
+| `GIT_WARP_HOST` | inferred from the remote arg / `origin` | git-warp target host to probe / route through WARP |
 | `GIT_WARP_PORT` | `443` | Port to probe for reachability |
 | `GIT_WARP_WAIT` | `40` | Seconds to wait for WARP to make the host reachable |
+| `GIT_WARP_DEBUG` | unset | When set (e.g. `1`), print the resolved subcommand / remote / host and exit **without** touching WARP or git — for testing host inference |
 | `WARP_HOST` | none (falls back to `GIT_WARP_HOST`) | warp-run target host; if neither is set, warp-run errors out |
 | `WARP_PORT` | `443` (falls back to `GIT_WARP_PORT`) | Port warp-run probes |
 | `WARP_WAIT` | `40` (falls back to `GIT_WARP_WAIT`) | Seconds warp-run waits for WARP |
 | `WARP_WRAP_CMDS` | empty | Extra command names to wrap transparently (space-separated, e.g. `"tea glab"`), routed through `warp-run` |
 
 Host resolution order: `GIT_WARP_HOST` wins; for `clone` the host is parsed
-from the clone URL on the command line (there's no `origin` yet); otherwise the
-host is parsed from `git remote get-url origin`. If you push to a remote other
-than `origin` and its host differs, set `GIT_WARP_HOST` explicitly.
+from the clone URL on the command line (there's no `origin` yet); for
+`push`/`pull`/`fetch`/`ls-remote` the host comes from the **remote argument**
+in the command (`fetch gitlab dev` → the `gitlab` remote), looked up in the
+repository selected by any leading `git -C <path>` global options; with no
+positional remote (e.g. `fetch --all`, `remote update`) or an unknown one it
+falls back to `origin`. Leading git global options (repeated `-C <path>`,
+`-c <kv>`, `--git-dir`, `--work-tree`, …) are parsed the way git itself does,
+so dropping `git-warp` in front of a `git -C /path -c … fetch <remote>` command
+resolves the host from the right repo and remote. Set `GIT_WARP_HOST` to
+override.
 
 ## Behavior notes
 
