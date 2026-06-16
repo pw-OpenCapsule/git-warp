@@ -38,6 +38,80 @@
 
 set -uo pipefail
 
+# --- batch mode --------------------------------------------------------------
+
+# Batch mode keeps WARP in the entry-state-managed scope for a whole command,
+# so scripts that invoke git-warp many times do not connect/disconnect WARP for
+# every single git command.
+if [ "${1:-}" = "batch" ] || [ "${1:-}" = "run" ]; then
+  shift
+  batch_host="${GIT_WARP_HOST:-}"
+  batch_port="${GIT_WARP_PORT:-}"
+  batch_wait="${GIT_WARP_WAIT:-}"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host)
+        [ "$#" -ge 2 ] || { echo "git-warp batch: --host requires a value" >&2; exit 2; }
+        batch_host="$2"
+        shift 2
+        ;;
+      --host=*)
+        batch_host="${1#--host=}"
+        shift
+        ;;
+      --port)
+        [ "$#" -ge 2 ] || { echo "git-warp batch: --port requires a value" >&2; exit 2; }
+        batch_port="$2"
+        shift 2
+        ;;
+      --port=*)
+        batch_port="${1#--port=}"
+        shift
+        ;;
+      --wait)
+        [ "$#" -ge 2 ] || { echo "git-warp batch: --wait requires a value" >&2; exit 2; }
+        batch_wait="$2"
+        shift 2
+        ;;
+      --wait=*)
+        batch_wait="${1#--wait=}"
+        shift
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        echo "git-warp batch: unknown option: $1" >&2
+        exit 2
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  if [ "$#" -eq 0 ]; then
+    echo "git-warp batch: no command given — usage: git-warp batch --host <host> -- <command> [args...]" >&2
+    exit 2
+  fi
+  if [ -z "$batch_host" ]; then
+    echo "git-warp batch: cannot determine target host — set --host or GIT_WARP_HOST" >&2
+    exit 2
+  fi
+
+  script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+  WARP_HOST="$batch_host" \
+    WARP_PORT="${batch_port:-${WARP_PORT:-${GIT_WARP_PORT:-443}}}" \
+    WARP_WAIT="${batch_wait:-${WARP_WAIT:-${GIT_WARP_WAIT:-40}}}" \
+    GIT_WARP_HOST="$batch_host" \
+    GIT_WARP_PORT="${batch_port:-${GIT_WARP_PORT:-443}}" \
+    GIT_WARP_WAIT="${batch_wait:-${GIT_WARP_WAIT:-40}}" \
+    "$script_dir/warp-run" "$@"
+  exit $?
+fi
+
 # --- resolve target host -----------------------------------------------------
 
 # Extract the hostname from a git remote URL. Handles both forms:

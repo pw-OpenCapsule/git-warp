@@ -48,6 +48,19 @@ git-warp clone https://your-internal-host/group/repo.git
 Any git arguments pass through unchanged. Exit code is git's exit code, or `2`
 if WARP couldn't make the host reachable in time.
 
+## Batch scripts
+
+For scripts that run many `git-warp` commands, wrap the whole script so WARP is
+connected once and restored once:
+
+```sh
+git-warp batch --host your-internal-host -- ./scripts/update_repos.sh
+GIT_WARP_HOST=your-internal-host git-warp batch -- ./scripts/update_repos.sh
+```
+
+Nested `git-warp` calls will see the host as already reachable and leave WARP
+untouched, avoiding connect/disconnect for every repository.
+
 ## Other commands — `warp-run`
 
 For non-git commands that also need the internal network (open a PR with `tea`
