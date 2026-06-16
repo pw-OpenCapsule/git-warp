@@ -63,6 +63,23 @@ git-warp push origin main
 git-warp clone https://your-internal-host/group/repo.git
 ```
 
+### 批量脚本：只连接一次 WARP
+
+如果一个脚本会循环执行很多次 `git-warp fetch`（例如同步上百个仓库），用
+`git-warp batch` 包住整个脚本。它会在进入时按需连接一次 WARP，脚本结束后再恢复
+WARP 原状；脚本内部的 `git-warp` 调用会看到目标 host 已可达，因此不会每次
+connect/disconnect。
+
+```sh
+git-warp batch --host sg-git.pwtk.cc -- ./scripts/update_repos.sh
+```
+
+也可以用环境变量指定 host：
+
+```sh
+GIT_WARP_HOST=sg-git.pwtk.cc git-warp batch -- ./scripts/update_repos.sh
+```
+
 ## 其它命令（不只是 git）
 
 除了 git，别的要连内网的命令（创建 PR、调内网 API…）也能用同一套 WARP 逻辑——用 `warp-run` 包一下：目标 host 不通时自动开 WARP，跑完恢复原状。
@@ -102,6 +119,7 @@ source ~/.local/bin/git-warp.plugin.sh
 | `GIT_WARP_PORT` | `443` | 探测可达性的端口 |
 | `GIT_WARP_WAIT` | `40` | 等 WARP 把主机变可达的秒数 |
 | `GIT_WARP_DEBUG` | 未设 | 设了（如 `1`）只打印解析出的 子命令/remote/host 然后退出，**不碰** WARP 和 git，用于排查 host 推断 |
+| `git-warp batch --host <host> -- <cmd>` | 无 | 批量模式：为整个命令保持一次 WARP 连接，适合多仓库同步脚本 |
 | `WARP_HOST` | 无（未设则回落 `GIT_WARP_HOST`） | warp-run 的目标主机；都没设 warp-run 报错退出 |
 | `WARP_PORT` | `443`（回落 `GIT_WARP_PORT`） | warp-run 探测端口 |
 | `WARP_WAIT` | `40`（回落 `GIT_WARP_WAIT`） | warp-run 等 WARP 的秒数 |
