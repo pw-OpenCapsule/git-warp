@@ -107,6 +107,24 @@ git-warp fetch --all
 git-warp clone https://your-internal-host/group/repo.git
 ```
 
+### Batch scripts: connect WARP once
+
+If a script loops over many `git-warp fetch` calls, wrap the whole script with
+`git-warp batch`. It connects WARP once when needed, runs the command, and then
+restores WARP to its entry state. Any nested `git-warp` calls see the target
+host as already reachable, so they do not connect/disconnect WARP for every
+single repository.
+
+```sh
+git-warp batch --host sg-git.pwtk.cc -- ./scripts/update_repos.sh
+```
+
+You can also provide the host via the existing environment variable:
+
+```sh
+GIT_WARP_HOST=sg-git.pwtk.cc git-warp batch -- ./scripts/update_repos.sh
+```
+
 ## Other commands (not just git)
 
 Other commands that need the internal network — opening a PR, calling an
@@ -152,6 +170,7 @@ opt in.
 | `GIT_WARP_PORT` | `443` | Port to probe for reachability |
 | `GIT_WARP_WAIT` | `40` | Seconds to wait for WARP to make the host reachable |
 | `GIT_WARP_DEBUG` | unset | When set (e.g. `1`), print the resolved subcommand / remote / host and exit **without** touching WARP or git — for testing host inference |
+| `git-warp batch --host <host> -- <cmd>` | none | Batch mode: keep one WARP scope around a whole command, useful for multi-repo sync scripts |
 | `WARP_HOST` | none (falls back to `GIT_WARP_HOST`) | warp-run target host; if neither is set, warp-run errors out |
 | `WARP_PORT` | `443` (falls back to `GIT_WARP_PORT`) | Port warp-run probes |
 | `WARP_WAIT` | `40` (falls back to `GIT_WARP_WAIT`) | Seconds warp-run waits for WARP |
