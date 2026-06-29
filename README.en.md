@@ -77,9 +77,10 @@ The wrapper only intercepts the **network** subcommands (`push`, `pull`,
 `fetch`, `clone`, `ls-remote`, and `remote update`). Every other subcommand
 (`commit`, `status`, `add`, `log`, `diff`, …) is passed straight through to the
 real git with **zero added behavior or latency**. And because `git-warp` only
-touches WARP when the remote is actually unreachable, public remotes like
-`github.com` are completely unaffected — only an internal-only remote triggers
-the auto-connect.
+manages WARP for hosts in the allowlist (`GIT_WARP_ALLOW_HOSTS`, default
+`sg-git.pwtk.cc`), every other remote (`github.com`, `gitlab.com`, …) is run
+through plain git untouched — even when it's unreachable from your network — so
+only the internal remote triggers the auto-connect.
 
 ### Without changing your shell (manual activation)
 
@@ -167,6 +168,7 @@ opt in.
 | Env var | Default | Meaning |
 |---|---|---|
 | `GIT_WARP_HOST` | inferred from the remote arg / `origin` | git-warp target host to probe / route through WARP |
+| `GIT_WARP_ALLOW_HOSTS` | `sg-git.pwtk.cc` | **Allowlist** of host patterns (comma/space-separated, shell globs, e.g. `"sg-git.pwtk.cc *.pwtk.cc"`) that git-warp manages WARP for. Any other host (or one that can't be determined) is run through plain git with WARP untouched. Set to `*` to manage every host (old behavior); an explicit `GIT_WARP_HOST` always bypasses it |
 | `GIT_WARP_PORT` | `443` | Port to probe for reachability |
 | `GIT_WARP_WAIT` | `40` | Seconds to wait for WARP to make the host reachable |
 | `GIT_WARP_DEBUG` | unset | When set (e.g. `1`), print the resolved subcommand / remote / host and exit **without** touching WARP or git — for testing host inference |
