@@ -29,9 +29,11 @@ git clone https://your-internal-host/group/repo.git
 
 The wrapper only intercepts the network subcommands (`push`, `pull`, `fetch`,
 `clone`, `ls-remote`, `remote update`); every other git subcommand passes
-straight through to the real git with no added behavior. Because `git-warp`
-only touches WARP when the remote is unreachable, public remotes (github.com)
-are unaffected — only an internal-only remote triggers the auto-connect.
+straight through to the real git with no added behavior. WARP is only ever
+managed for hosts in the allowlist (`GIT_WARP_ALLOW_HOSTS`, default
+`sg-git.pwtk.cc`) — every other remote (github.com, gitlab.com, …) is run
+through plain git untouched, even when it's unreachable from your network, so
+only the internal remote triggers the auto-connect.
 
 ## Usage — explicit (no shell changes)
 
@@ -100,6 +102,12 @@ Empty by default — nothing extra is wrapped unless you opt in.
   remote — resolved in the repo selected by any leading `git -C <path>`;
   otherwise from the `origin` remote URL). Leading git global options
   (`-C <path>`, `-c <kv>`, `--git-dir`, …) are parsed the way git does.
+- `GIT_WARP_ALLOW_HOSTS` — comma/space-separated list of host patterns (shell
+  globs allowed, e.g. `"sg-git.pwtk.cc *.pwtk.cc"`) that git-warp will manage
+  WARP for. Default: `sg-git.pwtk.cc`. Any other host (or one that can't be
+  determined) is run through plain git with WARP untouched. Set to `*` to manage
+  WARP for every host (pre-allowlist behavior). An explicit `GIT_WARP_HOST`
+  always bypasses the allowlist.
 - `GIT_WARP_PORT` — port to probe (default: `443`).
 - `GIT_WARP_WAIT` — seconds to wait for WARP (default: `40`).
 - `GIT_WARP_DEBUG` — when set (e.g. `1`), print the resolved subcommand /

@@ -116,6 +116,7 @@ source ~/.local/bin/git-warp.plugin.sh
 | 环境变量 | 默认值 | 含义 |
 |---|---|---|
 | `GIT_WARP_HOST` | `clone` 取 URL 的 host；`push`/`pull`/`fetch`/`ls-remote` 取命令里 **remote 参数**的 host（按前导 `-C` 选中的仓库查），否则取 `origin` 远端的 host | git-warp 探测 / 走 WARP 的目标主机 |
+| `GIT_WARP_ALLOW_HOSTS` | `sg-git.pwtk.cc` | **白名单**：只有匹配的 host 才会管理 WARP（逗号/空格分隔，支持 shell glob，如 `"sg-git.pwtk.cc *.pwtk.cc"`）。其他 host（或无法解析出 host）一律走原生 git、**不碰** WARP。设为 `*` 恢复「所有 host 都管」的旧行为；显式设了 `GIT_WARP_HOST` 时无视白名单 |
 | `GIT_WARP_PORT` | `443` | 探测可达性的端口 |
 | `GIT_WARP_WAIT` | `40` | 等 WARP 把主机变可达的秒数 |
 | `GIT_WARP_DEBUG` | 未设 | 设了（如 `1`）只打印解析出的 子命令/remote/host 然后退出，**不碰** WARP 和 git，用于排查 host 推断 |
