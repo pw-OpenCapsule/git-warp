@@ -31,6 +31,11 @@
 # other valued global options (-c <kv>, --git-dir <d>, --work-tree <d>, …) are
 # skipped together with their value so they're not mistaken for the subcommand
 # or remote name.
+# Host allowlist: WARP is only managed for hosts in $GIT_WARP_ALLOW_HOSTS
+# (comma/space-separated, shell-glob patterns; default "sg-git.pwtk.cc"). Any
+# other host — or one that can't be determined — is run through plain git with
+# WARP left untouched. Set GIT_WARP_ALLOW_HOSTS="*" for the old manage-every-host
+# behavior; an explicit $GIT_WARP_HOST always bypasses the allowlist.
 # Port defaults to 443 ($GIT_WARP_PORT to override).
 # Wait timeout defaults to 40s ($GIT_WARP_WAIT, in seconds).
 # Set GIT_WARP_DEBUG=1 to print the resolved host (and remote) and exit without
@@ -211,6 +216,10 @@ remote_arg() {
 }
 
 HOST="${GIT_WARP_HOST:-}"
+# Whether the host was set explicitly via GIT_WARP_HOST — an explicit host is
+# operator intent and always bypasses the allowlist below.
+HOST_EXPLICIT=0
+[ -n "$HOST" ] && HOST_EXPLICIT=1
 REMOTE=""
 
 # For `clone` there is no origin remote yet, so resolve the host from the
@@ -253,14 +262,44 @@ if [ -z "$HOST" ]; then
   fi
 fi
 
+# --- host allowlist ----------------------------------------------------------
+# git-warp only manages WARP for hosts in the allowlist; every other host (or a
+# host that couldn't be determined) is run straight through plain git and WARP
+# is never touched. This keeps WARP-management scoped to the internal remotes
+# that actually need it — public/other remotes (github.com, gitlab.com, …) are
+# completely unaffected even when they're unreachable from the current network.
+# GIT_WARP_ALLOW_HOSTS is a comma/space-separated list of host patterns (shell
+# globs allowed, e.g. "sg-git.pwtk.cc *.pwtk.cc"); it defaults to sg-git.pwtk.cc.
+# Set it to "*" to manage WARP for every host (the pre-allowlist behavior).
+# An explicit GIT_WARP_HOST always bypasses the allowlist (operator intent).
+GIT_WARP_ALLOW_HOSTS="${GIT_WARP_ALLOW_HOSTS:-sg-git.pwtk.cc}"
+
+host_allowed() {
+  local h="$1" pat
+  [ -n "$h" ] || return 1
+  for pat in ${GIT_WARP_ALLOW_HOSTS//,/ }; do
+    case "$h" in
+      $pat) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+allowed=0
+if [ "$HOST_EXPLICIT" -eq 1 ] || host_allowed "$HOST"; then
+  allowed=1
+fi
+
 if [ -n "${GIT_WARP_DEBUG:-}" ]; then
-  echo "git-warp: [debug] subcmd=${SUBCMD:-} remote=${REMOTE:-} cdirs=${CDIRS[*]:-} host=${HOST:-}" >&2
+  echo "git-warp: [debug] subcmd=${SUBCMD:-} remote=${REMOTE:-} cdirs=${CDIRS[*]:-} host=${HOST:-} allowed=${allowed} allow_hosts=${GIT_WARP_ALLOW_HOSTS}" >&2
   exit 0
 fi
 
-if [ -z "$HOST" ]; then
-  echo "git-warp: cannot determine target host — set GIT_WARP_HOST or add an 'origin' remote" >&2
-  exit 2
+# Not an allowlisted host (or host undeterminable): run plain git, never touch
+# WARP. This is the path normal remotes take in transparent mode.
+if [ "$allowed" -ne 1 ]; then
+  command git "$@"
+  exit $?
 fi
 
 PORT="${GIT_WARP_PORT:-443}"
