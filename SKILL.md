@@ -13,7 +13,7 @@ publicly reachable as `sg-cy-git.caminonode.com` with the same accounts.
 ```sh
 command -v sg-git-setup >/dev/null || \
   curl -fsSL https://raw.githubusercontent.com/pw-OpenCapsule/sg-git-setup/main/install.sh | sh
-sg-git-setup            # run inside a company repo to verify
+sg-git-setup --keep-warp   # agents: don't uninstall WARP unless the user asked
 ```
 
 Then retry the original git command unchanged; remotes do not need editing.
@@ -21,6 +21,7 @@ Then retry the original git command unchanged; remotes do not need editing.
 ## Notes
 
 - Check: `git config --global --get-all url.https://sg-cy-git.caminonode.com/.insteadOf`.
-- If verification fails with an auth error, the saved password is wrong. Re-run `sg-git-setup` in a terminal so git can prompt.
+- It tests the login on the web form. If it fails, the saved password is wrong; ask the user to run `sg-git-setup` in their own terminal so it can prompt.
+- Without `--keep-warp` it also uninstalls Cloudflare WARP (sudo).
 - `sg-git-setup --undo` removes the rules.
 - Do not turn on Cloudflare WARP or set up proxies for this host. The old git-warp tool (`legacy/`) is deprecated.
