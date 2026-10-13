@@ -1,8 +1,9 @@
 #!/bin/sh
 #
 # sg-git-setup — reach the company git (Gogs) through its public Cloudflare
-# entry instead of WARP. sg-git.pwtk.cc / sg-git.port888.com and
-# sg-cy-git.caminonode.com are the same server with the same accounts.
+# entry sg-git-src.pwtk.cc instead of WARP. sg-git.pwtk.cc, sg-git.port888.com,
+# sg-git-src.pwtk.cc and sg-cy-git.caminonode.com are the same server with the
+# same accounts; only sg-git.pwtk.cc is intranet-only.
 #
 # No repo needs changing: a global `url.<new>.insteadOf <old>` rule rewrites
 # the old https:// and git@host: remotes on every fetch / pull / push / clone.
@@ -13,9 +14,9 @@
 #
 set -eu
 
-NEW_HOST=sg-cy-git.caminonode.com
+NEW_HOST=sg-git-src.pwtk.cc
 NEW=https://$NEW_HOST/
-OLD_HOSTS="sg-git.pwtk.cc sg-git.port888.com"
+OLD_HOSTS="sg-git.pwtk.cc sg-git.port888.com sg-cy-git.caminonode.com"
 
 KEEP_WARP=0
 UNDO=0
@@ -31,6 +32,8 @@ has_tty() { (exec </dev/tty) 2>/dev/null; }
 
 clear_rules() {
   git config --global --unset-all "url.$NEW.insteadOf" 2>/dev/null || true
+  # earlier versions rewrote to sg-cy-git.caminonode.com
+  git config --global --unset-all "url.https://sg-cy-git.caminonode.com/.insteadOf" 2>/dev/null || true
   # old port888 -> pwtk rewrite; git rewrites only once, so it would not chain
   git config --global --unset-all "url.https://sg-git.pwtk.cc/.insteadOf" 2>/dev/null || true
 }
